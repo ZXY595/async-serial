@@ -1,52 +1,61 @@
 use std::{
-    ffi::OsStr,
-    fmt, io,
+    io,
     ops::{Deref, DerefMut},
     os::fd::{AsFd, AsRawFd, BorrowedFd, RawFd},
 };
 
 pub use async_io::Async;
 use async_io::IoSafe;
-pub use serial::{SerialPort, SerialPortSettings};
+pub use serialport::{SerialPortBuilder, new};
 pub mod error {
-    pub use serial::{Error, ErrorKind, Result};
+    pub use serialport::{Error, Result};
 }
 
-pub fn open(port: &(impl AsRef<OsStr> + ?Sized)) -> serial::Result<Async<SystemPort>> {
-    let port = serial::open(port)?;
-    SystemPort::from_serial(port).map_err(From::from)
+pub type AsyncSerialPort = Async<
+    IoSafeAdapter<
+        cfg_select! {
+            unix => serialport::TTYPort,
+            windows => serialport::COMPort,
+        },
+    >,
+>;
+pub trait AsyncSerialPortBuilder {
+    fn open_async(self) -> serialport::Result<AsyncSerialPort>;
 }
 
-/// An [`IoSafe`] newtype for [`serial::SystemPort`], useful for [`Async`] wrapper.
-pub struct SystemPort(serial::SystemPort);
-
-impl SystemPort {
-    pub fn from_serial(port: serial::SystemPort) -> io::Result<Async<Self>> {
-        Async::new(Self(port))
+impl AsyncSerialPortBuilder for serialport::SerialPortBuilder {
+    fn open_async(self) -> serialport::Result<AsyncSerialPort> {
+        self.open_native()
+            .map(IoSafeAdapter)
+            .and_then(|io| Async::new(io).map_err(From::from))
     }
 }
 
-impl Deref for SystemPort {
-    type Target = serial::SystemPort;
+/// An [`IoSafe`] newtype for [`serialport::SerialPort`] implementors, useful for [`Async`] wrapper.
+#[derive(Debug)]
+pub struct IoSafeAdapter<T>(T);
+
+impl<T> Deref for IoSafeAdapter<T> {
+    type Target = T;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl DerefMut for SystemPort {
+impl<T> DerefMut for IoSafeAdapter<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl io::Read for SystemPort {
+impl<T: io::Read> io::Read for IoSafeAdapter<T> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.0.read(buf)
     }
 }
 
-impl io::Write for SystemPort {
+impl<T: io::Write> io::Write for IoSafeAdapter<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.0.write(buf)
     }
@@ -56,26 +65,21 @@ impl io::Write for SystemPort {
 }
 
 /// # Safety:
-/// The implementation of [`io::Read`] and [`io::Write`] for [`serial::SystemPort`] is [`IoSafe`]
-unsafe impl IoSafe for SystemPort {}
+/// The implementation of [`io::Read`] and [`io::Write`] for the wrapped serial port is [`IoSafe`]
+unsafe impl<T: io::Read + io::Write> IoSafe for IoSafeAdapter<T> {}
 
-impl AsRawFd for SystemPort {
+impl<T: AsRawFd> AsRawFd for IoSafeAdapter<T> {
     fn as_raw_fd(&self) -> RawFd {
         self.0.as_raw_fd()
     }
 }
 
-impl AsFd for SystemPort {
+impl<T> AsFd for IoSafeAdapter<T>
+where
+    Self: AsRawFd,
+{
     fn as_fd(&self) -> BorrowedFd<'_> {
-        // Safety: This fd lifespan is tied to the `serial::SystemPort`
+        // Safety: This fd lifespan is tied to the `T`
         unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
-    }
-}
-
-impl fmt::Debug for SystemPort {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("SystemPort")
-            .field(&self.as_raw_fd())
-            .finish()
     }
 }

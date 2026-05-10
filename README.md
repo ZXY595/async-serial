@@ -1,6 +1,6 @@
 # async-serial
 
-Lightweight async serial port adapter — bridges [`serial`] with [`async-io`].
+Lightweight async serial port adapter — bridges [`serialport`] with [`async-io`].
 
 [![Crates.io](https://img.shields.io/crates/v/async-serial)](https://crates.io/crates/async-serial)
 [![License](https://img.shields.io/crates/l/async-serial)](https://github.com/ZXY595/async-serial#license)
@@ -8,13 +8,10 @@ Lightweight async serial port adapter — bridges [`serial`] with [`async-io`].
 ## Quickstart
 
 ```rust
-use async_serial::{open, SerialPort, SerialPortSettings}
+use async_serial::AsyncSerialPortBuilder;
 
-let mut port = open("/dev/ttyUSB0")?;
-port.reconfigure(&|settings| {
-    settings.set_baud_rate(serial::Baud9600)?;
-    Ok(())
-})?;
+let mut port = serialport::new("/dev/ttyUSB0", 9_600)
+    .open_async()?;
 
 // Async read — won't block the executor
 let mut buf = [0u8; 256];
@@ -23,13 +20,27 @@ let n = port.read(&mut buf).await?;
 
 ## How It Works
 
-`serial::SystemPort` implements `Read` + `Write` but those are blocking calls. `async-io` provides an `Async<T>` wrapper that makes any `IoSafe + AsFd` type non-blocking via the reactor. This crate provides the missing `IoSafe` and `AsFd` impls in a small newtype.
+`serialport::TTYPort` / `serialport::COMPort` implement `Read` + `Write` but those are blocking calls. `async-io` provides an `Async<T>` wrapper that makes any `IoSafe + AsFd` type non-blocking via the reactor.
+
+This crate provides:
+
+- **`IoSafeAdapter<T>`** — a newtype that supplies the missing `IoSafe` and `AsFd` impls
+- **`AsyncSerialPort`** — a type alias for `Async<IoSafeAdapter<platform port>>`
+- **`AsyncSerialPortBuilder`** — an extension trait that adds `.open_async()` to `SerialPortBuilder`
 
 ## API
 
-- **`open(path)`** — opens a serial port and returns `Async<SystemPort>`
-- **`SystemPort::from_serial(port)`** — wraps an existing `serial::SystemPort`
-- **`Deref<Target = serial::SystemPort>`** — transparent access to all serial methods
+- **`AsyncSerialPortBuilder::open_async()`** — opens a port via builder and wraps it for async IO
+- **`AsyncSerialPort`** — type alias: `Async<IoSafeAdapter<TTYPort>>` (unix) or `Async<IoSafeAdapter<COMPort>>` (windows)
+- **`IoSafeAdapter<T>`** — `Deref<Target = T>`, all serial methods accessible transparently
+- **Re-exports**: `Async`, `SerialPortBuilder`, `new`, `Error`, `Result`
+
+## Platform Support
+
+| Platform | Backend type   |
+|----------|---------------|
+| Unix     | `TTYPort`     |
+| Windows  | `COMPort`     |
 
 ## License
 

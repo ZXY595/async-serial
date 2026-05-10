@@ -1,13 +1,13 @@
 [package]
 name = "async-serial"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
-description = "Lightweight async serial port adapter for async-io + serial"
+description = "Lightweight async serial port adapter for async-io + serialport"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/ZXY595/async-serial"
-keywords = ["serial", "async", "serial-port", "async-io"]
+keywords = ["serialport", "async", "serial-port", "async-io"]
 categories = ["asynchronous", "hardware-support"]
 
 [dependencies]
 async-io = "2.6.0"
-serial = "0.4.0"
+serialport = "4.9.0"
