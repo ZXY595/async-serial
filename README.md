@@ -8,7 +8,7 @@ Lightweight async serial port adapter — bridges [`serialport`] with [`async-io
 ## Quickstart
 
 ```rust
-use async_serial::AsyncSerialPortBuilder;
+use async_serial::AsyncSerialPortBuilder as _;
 
 let mut port = serialport::new("/dev/ttyUSB0", 9_600)
     .open_async()?;
@@ -27,13 +27,6 @@ This crate provides:
 - **`IoSafeAdapter<T>`** — a newtype that supplies the missing `IoSafe` and `AsFd` impls
 - **`AsyncSerialPort`** — a type alias for `Async<IoSafeAdapter<platform port>>`
 - **`AsyncSerialPortBuilder`** — an extension trait that adds `.open_async()` to `SerialPortBuilder`
-
-## API
-
-- **`AsyncSerialPortBuilder::open_async()`** — opens a port via builder and wraps it for async IO
-- **`AsyncSerialPort`** — type alias: `Async<IoSafeAdapter<TTYPort>>` (unix) or `Async<IoSafeAdapter<COMPort>>` (windows)
-- **`IoSafeAdapter<T>`** — `Deref<Target = T>`, all serial methods accessible transparently
-- **Re-exports**: `Async`, `SerialPortBuilder`, `new`, `Error`, `Result`
 
 ## Platform Support
 
