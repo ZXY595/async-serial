@@ -1,8 +1,10 @@
 use std::{
     io,
     ops::{Deref, DerefMut},
-    os::fd::{AsFd, AsRawFd, BorrowedFd, RawFd},
 };
+
+#[cfg(any(target_family = "unix", target_os = "wasi"))]
+use std::os::fd::{AsFd, AsRawFd, BorrowedFd, RawFd};
 
 pub use async_io::Async;
 use async_io::IoSafe;
@@ -68,12 +70,14 @@ impl<T: io::Write> io::Write for IoSafeAdapter<T> {
 /// The implementation of [`io::Read`] and [`io::Write`] for the wrapped serial port is [`IoSafe`]
 unsafe impl<T: io::Read + io::Write> IoSafe for IoSafeAdapter<T> {}
 
+#[cfg(any(target_family = "unix", target_os = "wasi"))]
 impl<T: AsRawFd> AsRawFd for IoSafeAdapter<T> {
     fn as_raw_fd(&self) -> RawFd {
         self.0.as_raw_fd()
     }
 }
 
+#[cfg(any(target_family = "unix", target_os = "wasi"))]
 impl<T> AsFd for IoSafeAdapter<T>
 where
     Self: AsRawFd,
